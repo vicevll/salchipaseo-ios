@@ -2,6 +2,7 @@
 // Lo ejecuta GitHub Actions en un Mac; no necesitas correrlo en tu PC.
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { prepararPlugin, agregarWidget } from "./actividad-en-vivo.mjs";
 
 // Textos que iOS muestra al pedir permiso de ubicación (puedes cambiarlos)
 const TEXTO_UBICACION_AL_USAR = "SalchiPaseo usa tu ubicación para registrar el recorrido del paseo.";
@@ -17,6 +18,9 @@ if (!serverUrl || serverUrl.includes("TU-WEB")) {
 // 1) URL de tu web en la página de "sin conexión"
 const errorPath = "www/error.html";
 writeFileSync(errorPath, readFileSync(errorPath, "utf8").replaceAll("__SERVER_URL__", serverUrl));
+
+// 1b) Plugin de la actividad en vivo (antes de crear el proyecto, para que Capacitor lo registre)
+prepararPlugin();
 
 // 2) Crear el proyecto de Xcode (o actualizarlo si ya existe)
 const run = (cmd) => execSync(cmd, { stdio: "inherit" });
@@ -35,10 +39,19 @@ const setString = (key, value) => {
   if (re.test(plist)) plist = plist.replace(re, (_, a, b) => `${a}${esc(value)}${b}`);
   else addBeforeEnd(`\t<key>${key}</key>\n\t<string>${esc(value)}</string>`);
 };
+const setBool = (key, value) => {
+  const re = new RegExp(`(<key>${key}</key>\\s*)<(?:true|false)\\s*/>`);
+  const tag = value ? "<true/>" : "<false/>";
+  if (re.test(plist)) plist = plist.replace(re, (_, a) => `${a}${tag}`);
+  else addBeforeEnd(`\t<key>${key}</key>\n\t${tag}`);
+};
 setString("CFBundleDisplayName", config.appName);
 setString("CFBundleDevelopmentRegion", "es");
 setString("NSLocationWhenInUseUsageDescription", TEXTO_UBICACION_AL_USAR);
 setString("NSLocationAlwaysAndWhenInUseUsageDescription", TEXTO_UBICACION_SIEMPRE);
+// Actividad en vivo: el paseo en la pantalla bloqueada y en la isla dinámica
+setBool("NSSupportsLiveActivities", true);
+setBool("NSSupportsLiveActivitiesFrequentUpdates", true);
 if (!plist.includes("<key>UIBackgroundModes</key>")) {
   addBeforeEnd("\t<key>UIBackgroundModes</key>\n\t<array>\n\t\t<string>location</string>\n\t</array>");
 } else if (!/<key>UIBackgroundModes<\/key>\s*<array>[\s\S]*?<string>location<\/string>/.test(plist)) {
@@ -85,6 +98,9 @@ if (existsSync("icono.png")) {
   copyFileSync("icono.png", "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png");
   console.log("Ícono: icono.png");
 }
+
+// 7) Actividad en vivo: extensión de widget con Goku caminando
+await agregarWidget(config);
 
 console.log(`App: ${config.appName} (${config.appId})`);
 console.log(`Web: ${serverUrl}`);
