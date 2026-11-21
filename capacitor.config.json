@@ -1,0 +1,10 @@
+{
+  "appId": "cl.hazlacondatos.salchipaseo",
+  "appName": "SalchiPaseo",
+  "webDir": "www",
+  "server": {
+    "url": "https://vicevll.github.io/salchipaseo/",
+    "errorPath": "error.html",
+    "allowNavigation": ["vicevll.github.io"]
+  }
+}

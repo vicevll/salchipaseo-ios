@@ -1,0 +1,7 @@
+node_modules/
+build/
+Payload/
+*.ipa
+.DS_Store
+# El proyecto de Xcode se genera al compilar (scripts/preparar-ios.mjs)
+ios/

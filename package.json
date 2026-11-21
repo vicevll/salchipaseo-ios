@@ -1,0 +1,18 @@
+{
+  "name": "salchipaseo-ios",
+  "version": "1.0.0",
+  "description": "App iOS (Capacitor) de SalchiPaseo: GPS en segundo plano y avisos",
+  "scripts": {
+    "preparar-ios": "node scripts/preparar-ios.mjs"
+  },
+  "dependencies": {
+    "@capacitor-community/background-geolocation": "1.3.1",
+    "@capacitor/core": "8.6.2",
+    "@capacitor/ios": "8.6.2",
+    "@capacitor/local-notifications": "8.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.2"
+  },
+  "private": true
+}
