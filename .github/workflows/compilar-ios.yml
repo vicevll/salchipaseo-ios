@@ -1,0 +1,58 @@
+name: Compilar app iOS
+
+# Se ejecuta a mano (pestaña Actions → "Compilar app iOS" → Run workflow)
+# o automáticamente cuando subes cambios a la rama main.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "para-tu-web/**"
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+
+      - name: Preparar proyecto iOS (nombre, permisos, URL)
+        run: node scripts/preparar-ios.mjs
+
+      - name: Compilar (sin firmar; Sideloadly firma después)
+        run: |
+          xcodebuild build -quiet \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+          test -d build/Build/Products/Release-iphoneos/App.app
+
+      - name: Empaquetar .ipa
+        run: |
+          NOMBRE=$(node -p "require('./capacitor.config.json').appName.replace(/[^A-Za-z0-9]/g, '') || 'App'")
+          IPA="$NOMBRE-${{ github.run_number }}.ipa"
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qry "$IPA" Payload
+          echo "IPA=$IPA" >> "$GITHUB_ENV"
+
+      - name: Subir .ipa
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.IPA }}
+          archive: false
+          retention-days: 30
