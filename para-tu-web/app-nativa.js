@@ -18,6 +18,7 @@
   var BG = plugins.BackgroundGeolocation;
   var LN = plugins.LocalNotifications;
   var HTTP = plugins.CapacitorHttp;
+  var LIVE = plugins.SalchiLive; // actividad en vivo (pantalla bloqueada / isla dinámica)
 
   /* ------------------------------------------------------------------ */
   /* Ubicación (sigue funcionando con la pantalla bloqueada en la app)   */
@@ -149,6 +150,32 @@
     return Promise.resolve(id);
   }
 
+  /**
+   * Programa un aviso que se repite solo: todos los días, o un día de la semana, a una hora.
+   * @param {string} titulo
+   * @param {string} texto
+   * @param {{hora: number, minuto: number, diaSemana?: number}} cuando  diaSemana: 0 = domingo … 6 = sábado (sin él, todos los días)
+   * @param {{id?: number, sonido?: string, datos?: object}} [opciones]
+   * @returns {Promise<number>} id del aviso (para cancelarlo)
+   */
+  function programarAvisoRepetido(titulo, texto, cuando, opciones) {
+    opciones = opciones || {};
+    var id = typeof opciones.id === "number" ? opciones.id : Math.floor(Math.random() * 2000000000) + 1;
+    if (!LN) return Promise.resolve(id); // en el navegador no hay avisos repetidos
+    var on = { hour: cuando.hora, minute: cuando.minuto };
+    if (typeof cuando.diaSemana === "number") on.weekday = cuando.diaSemana + 1; // iOS: 1 = domingo
+    return LN.schedule({
+      notifications: [{
+        id: id,
+        title: titulo,
+        body: texto,
+        schedule: { on: on, allowWhileIdle: true },
+        sound: opciones.sonido || "sonido-por-defecto.wav",
+        extra: opciones.datos || null
+      }]
+    }).then(function () { return id; });
+  }
+
   /** Cancela un aviso programado. */
   function cancelarAviso(id) {
     if (LN) return LN.cancel({ notifications: [{ id: id }] });
@@ -197,15 +224,33 @@
       });
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Actividad en vivo (pantalla bloqueada e isla dinámica, iOS 16.2+)   */
+  /* ------------------------------------------------------------------ */
+  // datos: {perro, inicio (ms), pausa (ms o null), metros, metaMin, cuadro, segundos}
+  // En el navegador, o en una app sin la extensión, no hace nada.
+  var actividad = {
+    disponible: function () {
+      if (!LIVE) return Promise.resolve(false);
+      return LIVE.disponible().then(function (r) { return !!(r && r.disponible); }, function () { return false; });
+    },
+    iniciar: function (datos) { return LIVE ? LIVE.iniciar(datos || {}) : Promise.resolve(); },
+    actualizar: function (datos) { return LIVE ? LIVE.actualizar(datos || {}) : Promise.resolve(); },
+    // terminar({...datos}) muestra el resumen un rato; terminar({inmediato: true}) la quita al tiro
+    terminar: function (datos) { return LIVE ? LIVE.terminar(datos || {}) : Promise.resolve(); }
+  };
+
   window.AppNativa = {
     esApp: esApp,
     seguirUbicacion: seguirUbicacion,
     abrirAjustes: abrirAjustes,
     pedirPermisoAvisos: pedirPermisoAvisos,
     programarAviso: programarAviso,
+    programarAvisoRepetido: programarAvisoRepetido,
     cancelarAviso: cancelarAviso,
     avisosPendientes: avisosPendientes,
     alTocarAviso: alTocarAviso,
-    enviar: enviar
+    enviar: enviar,
+    actividad: actividad
   };
 })();
