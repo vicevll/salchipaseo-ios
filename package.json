@@ -1,7 +1,7 @@
 {
   "name": "salchipaseo-ios",
   "version": "1.0.0",
-  "description": "App iOS (Capacitor) de SalchiPaseo: GPS en segundo plano y avisos",
+  "description": "App iOS (Capacitor) de Guau Guau (antes SalchiPaseo): GPS en segundo plano y avisos",
   "scripts": {
     "preparar-ios": "node scripts/preparar-ios.mjs"
   },
