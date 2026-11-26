@@ -1,4 +1,4 @@
-// Actividad en vivo de SalchiPaseo: el paseo en la pantalla bloqueada y en la isla dinámica.
+// Actividad en vivo de Guau Guau (antes SalchiPaseo): el paseo en la pantalla bloqueada y en la isla dinámica.
 // La usa scripts/preparar-ios.mjs al compilar en GitHub Actions; no necesitas correrla en tu PC.
 //
 //  1) prepararPlugin(): crea el plugin de Capacitor "salchi-live" (Swift + ActivityKit) y lo instala,
@@ -31,11 +31,12 @@ public struct SalchiLiveAttributes: ActivityAttributes {
         public var pausa: Date?      // desde cuándo está en pausa (nil si avanza)
         public var metros: Double
         public var metaMin: Int      // mínimo del paseo, en minutos
-        public var cuadro: Int       // pose de Goku (cambia en cada actualización)
+        public var cuadro: Int       // pose del perro (cambia en cada actualización)
         public var segundos: Int     // duración final (al terminar)
         public var terminado: Bool
+        public var raza: String      // salchicha, pug o golden: cambia el perro que camina
 
-        public init(inicio: Date, pausa: Date?, metros: Double, metaMin: Int, cuadro: Int, segundos: Int, terminado: Bool) {
+        public init(inicio: Date, pausa: Date?, metros: Double, metaMin: Int, cuadro: Int, segundos: Int, terminado: Bool, raza: String) {
             self.inicio = inicio
             self.pausa = pausa
             self.metros = metros
@@ -43,6 +44,7 @@ public struct SalchiLiveAttributes: ActivityAttributes {
             self.cuadro = cuadro
             self.segundos = segundos
             self.terminado = terminado
+            self.raza = raza
         }
     }
 
@@ -108,7 +110,7 @@ public class SalchiLivePlugin: CAPPlugin, CAPBridgedPlugin {
                     return
                 }
                 guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-                    call.reject("Las actividades en vivo están desactivadas para SalchiPaseo en Ajustes", "DESACTIVADAS")
+                    call.reject("Las actividades en vivo están desactivadas para Guau Guau en Ajustes", "DESACTIVADAS")
                     return
                 }
                 do {
@@ -179,7 +181,8 @@ public class SalchiLivePlugin: CAPPlugin, CAPBridgedPlugin {
             metaMin: call.getInt("metaMin") ?? 30,
             cuadro: call.getInt("cuadro") ?? 0,
             segundos: call.getInt("segundos") ?? 0,
-            terminado: terminado)
+            terminado: terminado,
+            raza: ["salchicha", "pug", "golden"].contains(call.getString("raza") ?? "") ? call.getString("raza")! : "salchicha")
     }
     #endif
 }
@@ -216,7 +219,7 @@ const WIDGET_SWIFT = String.raw`import ActivityKit
 import SwiftUI
 import WidgetKit
 
-// Colores de SalchiPaseo
+// Colores de Guau Guau
 enum Paleta {
     static let naranja = Color(red: 1.0, green: 0.42, blue: 0.102)       // #FF6B1A
     static let amarillo = Color(red: 1.0, green: 0.776, blue: 0.161)     // #FFC629
@@ -263,15 +266,16 @@ struct ImagenGoku: View {
 struct GokuCaminando: View {
     let estado: SalchiLiveAttributes.ContentState
     var body: some View {
-        ImagenGoku(nombre: estado.terminado ? "goku-cara" : "goku-paso-\(((estado.cuadro % 4) + 4) % 4)")
+        ImagenGoku(nombre: estado.terminado ? "\(estado.raza)-cara" : "\(estado.raza)-paso-\(((estado.cuadro % 4) + 4) % 4)")
     }
 }
 
 struct CaraGoku: View {
+    let raza: String
     var body: some View {
         ZStack {
             Circle().fill(Paleta.amarillo)
-            ImagenGoku(nombre: "goku-cara").clipShape(Circle())
+            ImagenGoku(nombre: "\(raza)-cara").clipShape(Circle())
         }
     }
 }
@@ -393,7 +397,7 @@ struct SalchiLiveActividad: Widget {
                         .padding(.top, 2)
                 }
             } compactLeading: {
-                CaraGoku().frame(width: 24, height: 24)
+                CaraGoku(raza: contexto.state.raza).frame(width: 24, height: 24)
             } compactTrailing: {
                 Cronometro(estado: contexto.state)
                     .font(redondeada(14, .bold).monospacedDigit())
@@ -401,7 +405,7 @@ struct SalchiLiveActividad: Widget {
                     .multilineTextAlignment(.trailing)
                     .frame(width: 52)
             } minimal: {
-                CaraGoku().frame(width: 22, height: 22)
+                CaraGoku(raza: contexto.state.raza).frame(width: 22, height: 22)
             }
             .keylineTint(Paleta.naranja)
         }
@@ -423,7 +427,7 @@ const INFO_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>es</string>
 	<key>CFBundleDisplayName</key>
-	<string>SalchiPaseo</string>
+	<string>Guau Guau</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -507,7 +511,7 @@ export function prepararPlugin() {
   escribir(join(base, "package.json"), JSON.stringify({
     name: "salchi-live",
     version: "1.0.0",
-    description: "Actividad en vivo de SalchiPaseo (pantalla bloqueada e isla dinámica)",
+    description: "Actividad en vivo de Guau Guau (pantalla bloqueada e isla dinámica)",
     private: true,
     license: "MIT",
     capacitor: { ios: { src: "ios" } }
@@ -519,40 +523,37 @@ export function prepararPlugin() {
   console.log("Plugin de la actividad en vivo: listo");
 }
 
-// Recorta 4 poses de Goku caminando (del sprite de la web) y su cara (del ícono de la app)
+// Recorta 4 poses de cada perro caminando (de los sprites de la web) y su cara
+const RAZAS_WIDGET = [
+  { id: "salchicha", sprite: "goku-caminando-sprite.webp", cara: "goku-cara.webp", ancho: 360, alto: 252 },
+  { id: "pug", sprite: "pug-caminando-sprite.webp", cara: "pug-cara.webp", ancho: 300, alto: 288 },
+  { id: "golden", sprite: "golden-caminando-sprite.webp", cara: "golden-cara.webp", ancho: 340, alto: 274 }
+];
 export async function crearImagenes(dir, config) {
-  try {
-    try { await import("sharp"); } catch { run("npm install --no-save --no-audit --no-fund sharp@0.35"); }
-    const { default: sharp } = await import("sharp");
-    const web = String(config.server?.url || "").replace(/\/?$/, "/");
-    const respuesta = await fetch(web + "goku-caminando-sprite.webp");
-    if (!respuesta.ok) throw new Error(`sprite: HTTP ${respuesta.status}`);
-    const sprite = Buffer.from(await respuesta.arrayBuffer());
-    const ANCHO = 360, ALTO = 252, COLUMNAS = 6, POSES = [0, 6, 12, 18];
-    for (let i = 0; i < POSES.length; i++) {
-      const p = POSES[i];
-      await sharp(sprite)
-        .extract({ left: (p % COLUMNAS) * ANCHO, top: Math.floor(p / COLUMNAS) * ALTO, width: ANCHO, height: ALTO })
-        .resize(270, 189)
-        .png({ compressionLevel: 9 })
-        .toFile(join(dir, `goku-paso-${i}.png`));
-    }
-    if (existsSync("icono.png")) {
-      const meta = await sharp(readFileSync("icono.png")).metadata();
-      const lado = Math.round(meta.width * 0.797), borde = Math.round((meta.width - lado) / 2);
-      await sharp(readFileSync("icono.png"))
-        .extract({ left: borde, top: borde, width: lado, height: lado })
-        .resize(120, 120)
-        .png({ compressionLevel: 9 })
-        .toFile(join(dir, "goku-cara.png"));
-    } else {
-      const cara = await fetch(web + "goku-cara.webp");
+  try { await import("sharp"); } catch { run("npm install --no-save --no-audit --no-fund sharp@0.35"); }
+  const { default: sharp } = await import("sharp");
+  const web = String(config.server?.url || "").replace(/\/?$/, "/");
+  const COLUMNAS = 6, POSES = [0, 6, 12, 18];
+  for (const r of RAZAS_WIDGET) {
+    try {
+      const respuesta = await fetch(web + r.sprite);
+      if (!respuesta.ok) throw new Error(`sprite: HTTP ${respuesta.status}`);
+      const sprite = Buffer.from(await respuesta.arrayBuffer());
+      for (let i = 0; i < POSES.length; i++) {
+        const p = POSES[i];
+        await sharp(sprite)
+          .extract({ left: (p % COLUMNAS) * r.ancho, top: Math.floor(p / COLUMNAS) * r.alto, width: r.ancho, height: r.alto })
+          .resize({ width: 270 })
+          .png({ compressionLevel: 9 })
+          .toFile(join(dir, `${r.id}-paso-${i}.png`));
+      }
+      const cara = await fetch(web + r.cara);
       if (!cara.ok) throw new Error(`cara: HTTP ${cara.status}`);
-      await sharp(Buffer.from(await cara.arrayBuffer())).resize(120, 120).png().toFile(join(dir, "goku-cara.png"));
+      await sharp(Buffer.from(await cara.arrayBuffer())).resize(120, 120).png({ compressionLevel: 9 }).toFile(join(dir, `${r.id}-cara.png`));
+      console.log(`Imágenes de la actividad en vivo (${r.id}): listas`);
+    } catch (e) {
+      console.warn(`AVISO: no pude crear las imágenes de ${r.id} (${e.message}). Se verá una huella en su lugar.`);
     }
-    console.log("Imágenes de la actividad en vivo: listas");
-  } catch (e) {
-    console.warn(`AVISO: no pude crear las imágenes de Goku (${e.message}). Se verá una huella en su lugar.`);
   }
 }
 

@@ -5,8 +5,8 @@ import { execSync } from "node:child_process";
 import { prepararPlugin, agregarWidget } from "./actividad-en-vivo.mjs";
 
 // Textos que iOS muestra al pedir permiso de ubicación (puedes cambiarlos)
-const TEXTO_UBICACION_AL_USAR = "SalchiPaseo usa tu ubicación para registrar el recorrido del paseo.";
-const TEXTO_UBICACION_SIEMPRE = "SalchiPaseo necesita tu ubicación también con la pantalla bloqueada para seguir registrando el paseo.";
+const TEXTO_UBICACION_AL_USAR = "Guau Guau usa tu ubicación para registrar el recorrido del paseo.";
+const TEXTO_UBICACION_SIEMPRE = "Guau Guau necesita tu ubicación también con la pantalla bloqueada para seguir registrando el paseo.";
 
 const config = JSON.parse(readFileSync("capacitor.config.json", "utf8"));
 const serverUrl = config.server?.url;
