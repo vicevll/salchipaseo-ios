@@ -6,6 +6,7 @@ name: Compilar apps (iPhone y Android)
 #  · GuauGuau-N.ipa            → para instalar en tu iPhone con Sideloadly
 #  · GuauGuau-simulador-N.zip  → iPhone de prueba en el navegador (Appetize)
 #  · GuauGuau-android-N.apk    → Android de prueba (Appetize o emulador de Android Studio)
+#  · GuauGuau-N.aab            → para subir a Google Play (solo si agregaste la llave en Secrets)
 # Si agregas el secreto APPETIZE_TOKEN, sube solas las versiones de prueba a Appetize.
 on:
   workflow_dispatch:
@@ -13,7 +14,6 @@ on:
     branches: [main]
     paths-ignore:
       - "**.md"
-      - "para-tu-web/**"
 
 jobs:
   build:
@@ -102,6 +102,7 @@ jobs:
     timeout-minutes: 30
     env:
       APPETIZE_TOKEN: ${{ secrets.APPETIZE_TOKEN }}
+      LLAVE_PLAY: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
     steps:
       - uses: actions/checkout@v7
@@ -138,6 +139,36 @@ jobs:
           path: ${{ env.APK }}
           archive: false
           retention-days: 30
+
+      - name: Comprobar la versión de producción optimizada (sin llave todavía)
+        if: env.LLAVE_PLAY == ''
+        run: cd android && ./gradlew bundleRelease --no-daemon
+
+      - name: Compilar .aab firmado para Google Play (solo si está la llave)
+        if: env.LLAVE_PLAY != ''
+        env:
+          CLAVE_LLAVE: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          echo "$LLAVE_PLAY" | base64 --decode > "$RUNNER_TEMP/llave.jks"
+          cd android
+          ./gradlew bundleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/llave.jks" \
+            -Pandroid.injected.signing.store.password="$CLAVE_LLAVE" \
+            -Pandroid.injected.signing.key.alias=guauguau \
+            -Pandroid.injected.signing.key.password="$CLAVE_LLAVE"
+          cd ..
+          rm -f "$RUNNER_TEMP/llave.jks"
+          AAB="$(node -p "require('./capacitor.config.json').appName.replace(/[^A-Za-z0-9]/g, '') || 'App'")-${{ github.run_number }}.aab"
+          cp android/app/build/outputs/bundle/release/app-release.aab "$AAB"
+          echo "AAB=$AAB" >> "$GITHUB_ENV"
+
+      - name: Subir .aab para Google Play
+        if: env.LLAVE_PLAY != ''
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.AAB }}
+          archive: false
+          retention-days: 90
 
       - name: Enviar a Appetize (solo si configuraste APPETIZE_TOKEN)
         if: env.APPETIZE_TOKEN != ''
