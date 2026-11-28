@@ -25,6 +25,10 @@ if (!man.includes("xmlns:tools")) {
     "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n    xmlns:tools=\"http://schemas.android.com/tools\"");
 }
 man = man.replace('android:allowBackup="true"', 'android:allowBackup="false"');
+// Solo vertical: la app no se gira
+if (!man.includes("android:screenOrientation")) {
+  man = man.replace('android:name=".MainActivity"', 'android:name=".MainActivity"\n            android:screenOrientation="portrait"');
+}
 if (!man.includes("BackgroundGeolocationService")) {
   man = man.replace("</application>",
     "    <service android:name=\"com.equimaps.capacitor_background_geolocation.BackgroundGeolocationService\"\n" +

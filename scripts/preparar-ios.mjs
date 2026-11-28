@@ -53,6 +53,16 @@ setString("NSLocationAlwaysAndWhenInUseUsageDescription", TEXTO_UBICACION_SIEMPR
 setBool("NSSupportsLiveActivities", true);
 setBool("NSSupportsLiveActivitiesFrequentUpdates", true);
 setBool("ITSAppUsesNonExemptEncryption", false); // solo HTTPS estándar: sin cifrado propio
+// Solo vertical: la app no se gira (iPhone y iPad)
+const setArray = (key, values) => {
+  const xml = `<array>\n${values.map((v) => `\t\t<string>${v}</string>`).join("\n")}\n\t</array>`;
+  const re = new RegExp(`(<key>${key}</key>\\s*)<array>[\\s\\S]*?</array>`);
+  if (re.test(plist)) plist = plist.replace(re, (_, a) => `${a}${xml}`);
+  else addBeforeEnd(`\t<key>${key}</key>\n\t${xml}`);
+};
+setArray("UISupportedInterfaceOrientations", ["UIInterfaceOrientationPortrait"]);
+setArray("UISupportedInterfaceOrientations~ipad", ["UIInterfaceOrientationPortrait"]);
+setBool("UIRequiresFullScreen", true);
 if (!plist.includes("<key>UIBackgroundModes</key>")) {
   addBeforeEnd("\t<key>UIBackgroundModes</key>\n\t<array>\n\t\t<string>location</string>\n\t</array>");
 } else if (!/<key>UIBackgroundModes<\/key>\s*<array>[\s\S]*?<string>location<\/string>/.test(plist)) {
