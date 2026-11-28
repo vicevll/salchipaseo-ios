@@ -71,7 +71,99 @@ if (existsSync("icono.png")) {
   console.log(`Ícono y ${splashes.length} pantallas de carga: listos`);
 }
 
-// 5) Versión con el número de compilación y la de producción optimizada (R8), como pide Google Play
+// 5) GPS sin cortes con el ahorro de batería: plugin propio "Energia" (estado y permiso para funcionar sin restricciones)
+const paquete = config.appId;
+const carpetaJava = join("android/app/src/main/java", ...paquete.split("."));
+writeFileSync(join(carpetaJava, "EnergiaPlugin.java"), `package ${paquete};
+
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.os.PowerManager;
+import android.provider.Settings;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+
+// Para que el GPS del paseo no se corte con el ahorro de batería de Android ni de cada marca.
+@CapacitorPlugin(name = "Energia")
+public class EnergiaPlugin extends Plugin {
+    private PowerManager pm() { return (PowerManager) getContext().getSystemService(Context.POWER_SERVICE); }
+
+    @PluginMethod
+    public void estado(PluginCall call) {
+        PowerManager pm = pm();
+        String pkg = getContext().getPackageName();
+        boolean ahorro = pm != null && pm.isPowerSaveMode();
+        int modoGps = (pm != null && Build.VERSION.SDK_INT >= 28) ? pm.getLocationPowerSaveMode() : 0;
+        JSObject r = new JSObject();
+        r.put("sinRestricciones", pm == null || Build.VERSION.SDK_INT < 23 || pm.isIgnoringBatteryOptimizations(pkg));
+        r.put("ahorroActivo", ahorro);
+        r.put("gpsLimitado", ahorro && modoGps != 0);
+        r.put("fabricante", Build.MANUFACTURER == null ? "" : Build.MANUFACTURER.toLowerCase());
+        call.resolve(r);
+    }
+
+    // Muestra el aviso de Android "¿Permitir que la app se ejecute siempre en segundo plano?"
+    @PluginMethod
+    public void pedirSinRestricciones(PluginCall call) {
+        String pkg = getContext().getPackageName();
+        try {
+            Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + pkg));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+        } catch (Exception e) {
+            abrir(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+        }
+        call.resolve();
+    }
+
+    // Ajustes de la app (ahí cada marca pone su "batería", "inicio automático", etc.)
+    @PluginMethod
+    public void abrirAjustesApp(PluginCall call) {
+        abrir(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getContext().getPackageName())));
+        call.resolve();
+    }
+
+    private void abrir(Intent i) {
+        try { i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); getContext().startActivity(i); } catch (Exception ignored) {}
+    }
+}
+`);
+const mainPath = join(carpetaJava, "MainActivity.java");
+let main = readFileSync(mainPath, "utf8");
+if (!main.includes("EnergiaPlugin")) {
+  main = main.replace("import com.getcapacitor.BridgeActivity;", "import android.os.Bundle;\nimport com.getcapacitor.BridgeActivity;")
+    .replace(/public class MainActivity extends BridgeActivity \{\s*\}/, `public class MainActivity extends BridgeActivity {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(EnergiaPlugin.class);
+        super.onCreate(savedInstanceState);
+    }
+}`);
+  writeFileSync(mainPath, main);
+}
+if (!readFileSync(mainPath, "utf8").includes("registerPlugin(EnergiaPlugin.class)")) {
+  console.warn("AVISO: no pude registrar el plugin Energia en MainActivity: la app funciona igual, pero sin el aviso de batería.");
+}
+// Que R8 (la versión optimizada) no borre ni renombre el plugin
+const proguardPath = "android/app/proguard-rules.pro";
+const reglas = existsSync(proguardPath) ? readFileSync(proguardPath, "utf8") : "";
+if (!reglas.includes("EnergiaPlugin")) {
+  writeFileSync(proguardPath, reglas + `\n# Plugin propio de batería (Guau Guau)\n-keep class ${paquete}.EnergiaPlugin { *; }\n`);
+}
+man = readFileSync(manPath, "utf8");
+if (!man.includes("REQUEST_IGNORE_BATTERY_OPTIMIZATIONS")) {
+  man = man.replace("</manifest>",
+    "    <!-- App de seguimiento de actividad: pide funcionar sin restricciones de batería para no cortar el GPS del paseo -->\n" +
+    "    <uses-permission android:name=\"android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS\" />\n</manifest>");
+  writeFileSync(manPath, man);
+}
+
+// 6) Versión con el número de compilación y la de producción optimizada (R8), como pide Google Play
 const gradlePath = "android/app/build.gradle";
 let gradle = readFileSync(gradlePath, "utf8");
 gradle = gradle.replace(/minifyEnabled false/, "minifyEnabled true\n            shrinkResources true")

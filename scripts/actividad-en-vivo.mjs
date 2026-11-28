@@ -34,7 +34,7 @@ public struct SalchiLiveAttributes: ActivityAttributes {
         public var cuadro: Int       // pose del perro (cambia en cada actualización)
         public var segundos: Int     // duración final (al terminar)
         public var terminado: Bool
-        public var raza: String      // salchicha, pug o golden: cambia el perro que camina
+        public var raza: String      // salchicha, pug, golden o terrier: cambia el perro que camina
 
         public init(inicio: Date, pausa: Date?, metros: Double, metaMin: Int, cuadro: Int, segundos: Int, terminado: Bool, raza: String) {
             self.inicio = inicio
@@ -182,7 +182,7 @@ public class SalchiLivePlugin: CAPPlugin, CAPBridgedPlugin {
             cuadro: call.getInt("cuadro") ?? 0,
             segundos: call.getInt("segundos") ?? 0,
             terminado: terminado,
-            raza: ["salchicha", "pug", "golden"].contains(call.getString("raza") ?? "") ? call.getString("raza")! : "salchicha")
+            raza: ["salchicha", "pug", "golden", "terrier"].contains(call.getString("raza") ?? "") ? call.getString("raza")! : "salchicha")
     }
     #endif
 }
@@ -527,7 +527,8 @@ export function prepararPlugin() {
 const RAZAS_WIDGET = [
   { id: "salchicha", sprite: "goku-caminando-sprite.webp", cara: "goku-cara.webp", ancho: 360, alto: 252 },
   { id: "pug", sprite: "pug-caminando-sprite.webp", cara: "pug-cara.webp", ancho: 300, alto: 288 },
-  { id: "golden", sprite: "golden-caminando-sprite.webp", cara: "golden-cara.webp", ancho: 340, alto: 274 }
+  { id: "golden", sprite: "golden-caminando-sprite.webp", cara: "golden-cara.webp", ancho: 340, alto: 274 },
+  { id: "terrier", sprite: "terrier-caminando-sprite.webp", cara: "terrier-cara.webp", ancho: 320, alto: 281 }
 ];
 export async function crearImagenes(dir, config) {
   try { await import("sharp"); } catch { run("npm install --no-save --no-audit --no-fund sharp@0.35"); }
