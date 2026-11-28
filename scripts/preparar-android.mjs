@@ -1,4 +1,4 @@
-// Genera y configura el proyecto Android para PROBAR la app (APK de prueba, sin publicar).
+// Genera y configura el proyecto Android: APK de prueba y, si hay llave, el .aab para Google Play.
 // Lo ejecuta GitHub Actions en Linux; no necesitas correrlo en tu PC.
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -71,9 +71,11 @@ if (existsSync("icono.png")) {
   console.log(`Ícono y ${splashes.length} pantallas de carga: listos`);
 }
 
-// 5) Versión de prueba con el número de compilación
+// 5) Versión con el número de compilación y la de producción optimizada (R8), como pide Google Play
 const gradlePath = "android/app/build.gradle";
 let gradle = readFileSync(gradlePath, "utf8");
+gradle = gradle.replace(/minifyEnabled false/, "minifyEnabled true\n            shrinkResources true")
+  .replace("getDefaultProguardFile('proguard-android.txt')", "getDefaultProguardFile('proguard-android-optimize.txt')");
 const n = process.env.GITHUB_RUN_NUMBER || "1";
 gradle = gradle.replace(/versionCode \d+/, `versionCode ${n}`).replace(/versionName "[^"]*"/, `versionName "1.0.${n}"`);
 writeFileSync(gradlePath, gradle);

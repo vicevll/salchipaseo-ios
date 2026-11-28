@@ -52,6 +52,7 @@ setString("NSLocationAlwaysAndWhenInUseUsageDescription", TEXTO_UBICACION_SIEMPR
 // Actividad en vivo: el paseo en la pantalla bloqueada y en la isla dinámica
 setBool("NSSupportsLiveActivities", true);
 setBool("NSSupportsLiveActivitiesFrequentUpdates", true);
+setBool("ITSAppUsesNonExemptEncryption", false); // solo HTTPS estándar: sin cifrado propio
 if (!plist.includes("<key>UIBackgroundModes</key>")) {
   addBeforeEnd("\t<key>UIBackgroundModes</key>\n\t<array>\n\t\t<string>location</string>\n\t</array>");
 } else if (!/<key>UIBackgroundModes<\/key>\s*<array>[\s\S]*?<string>location<\/string>/.test(plist)) {
