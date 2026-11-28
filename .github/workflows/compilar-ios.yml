@@ -1,7 +1,12 @@
-name: Compilar app iOS
+name: Compilar apps (iPhone y Android)
 
-# Se ejecuta a mano (pestaña Actions → "Compilar app iOS" → Run workflow)
+# Se ejecuta a mano (pestaña Actions → "Compilar apps" → Run workflow)
 # o automáticamente cuando subes cambios a la rama main.
+# Entrega:
+#  · GuauGuau-N.ipa            → para instalar en tu iPhone con Sideloadly
+#  · GuauGuau-simulador-N.zip  → iPhone de prueba en el navegador (Appetize)
+#  · GuauGuau-android-N.apk    → Android de prueba (Appetize o emulador de Android Studio)
+# Si agregas el secreto APPETIZE_TOKEN, sube solas las versiones de prueba a Appetize.
 on:
   workflow_dispatch:
   push:
@@ -12,8 +17,11 @@ on:
 
 jobs:
   build:
+    name: iPhone
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 40
+    env:
+      APPETIZE_TOKEN: ${{ secrets.APPETIZE_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7
@@ -48,6 +56,7 @@ jobs:
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/App.app Payload/
           zip -qry "$IPA" Payload
+          echo "NOMBRE=$NOMBRE" >> "$GITHUB_ENV"
           echo "IPA=$IPA" >> "$GITHUB_ENV"
 
       - name: Subir .ipa
@@ -56,3 +65,82 @@ jobs:
           path: ${{ env.IPA }}
           archive: false
           retention-days: 30
+
+      - name: Compilar para el simulador de iPhone (pruebas en el navegador)
+        run: |
+          xcodebuild build -quiet \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build-sim \
+            ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+          SIM="$NOMBRE-simulador-${{ github.run_number }}.zip"
+          (cd build-sim/Build/Products/Debug-iphonesimulator && zip -qry "$GITHUB_WORKSPACE/$SIM" App.app)
+          echo "SIM=$SIM" >> "$GITHUB_ENV"
+
+      - name: Subir versión de simulador
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.SIM }}
+          archive: false
+          retention-days: 30
+
+      - name: Enviar a Appetize (solo si configuraste APPETIZE_TOKEN)
+        if: env.APPETIZE_TOKEN != ''
+        env:
+          APPETIZE_CLAVE: ${{ vars.APPETIZE_IOS }}
+        run: node scripts/subir-appetize.mjs ios "$SIM"
+
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      APPETIZE_TOKEN: ${{ secrets.APPETIZE_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+
+      - name: Preparar proyecto Android (permisos, ícono, URL)
+        run: node scripts/preparar-android.mjs
+
+      - name: Compilar APK de prueba
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+          cd ..
+          NOMBRE=$(node -p "require('./capacitor.config.json').appName.replace(/[^A-Za-z0-9]/g, '') || 'App'")
+          APK="$NOMBRE-android-${{ github.run_number }}.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
+          echo "APK=$APK" >> "$GITHUB_ENV"
+
+      - name: Subir APK
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.APK }}
+          archive: false
+          retention-days: 30
+
+      - name: Enviar a Appetize (solo si configuraste APPETIZE_TOKEN)
+        if: env.APPETIZE_TOKEN != ''
+        env:
+          APPETIZE_CLAVE: ${{ vars.APPETIZE_ANDROID }}
+        run: node scripts/subir-appetize.mjs android "$APK"
